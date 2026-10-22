@@ -2,66 +2,60 @@
 
 A mobile-first daily business manager for small businesses in India.
 
-## MVP goal
+## Current status
 
-Help one owner manage one business from one daily dashboard with a dependable transaction engine.
+**Phase 2 in progress:** responsive dashboard preview, initial finance calculation utilities, transaction input validation, a Supabase PostgreSQL schema and an atomic transaction-creation RPC. The dashboard still uses sample figures; live authentication and database wiring are not yet configured.
 
-### MVP scope
+## Local development
 
-- Single business and single owner
-- Dashboard: sales, collections, expenses, cash position and outstanding dues
-- Transactions: sales, purchases, expenses, customer receipts, supplier payments and refunds
-- Parties: basic customer and supplier records
-- Basic product catalogue and stock movements
-- Daily and monthly summaries, CSV export and daily closing
-- Responsive, installable Progressive Web App (PWA)
-- Free core tier; paid features are deferred until usage is validated
+Requirements: Node.js 20 or newer and npm.
 
-### Out of scope for first release
+```bash
+npm install
+npm run dev
+```
 
-Multi-user/staff access, multiple branches, automated GST returns, bank integrations, payroll, advanced analytics and complex wholesale workflows.
+Open http://localhost:3000.
 
-## Financial correctness principles
+## Validation
 
-1. Keep sales, cash received, expenses, supplier payments and profit as separate concepts.
-2. Store money as integer paise or an exact decimal type; never use floating-point values for money.
-3. Save a financial transaction and all related records atomically.
-4. Support partial payments and credit balances explicitly.
-5. Never silently overwrite posted financial transactions; use reversal/correction records.
-6. Enforce tenant/business authorization server-side.
-7. Use idempotency keys to prevent duplicates on retries and offline synchronization.
-8. Record audit events for financial mutations.
-9. Test the accounting invariants and dashboard calculations automatically.
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
 
-## Suggested initial technology direction
+## Database setup
 
-- TypeScript and a responsive React PWA
-- API-backed application with server-side transaction validation
-- PostgreSQL for durable relational data
-- Automated unit, integration and end-to-end tests
-- CI checks before changes are merged
+The initial schema targets Supabase PostgreSQL and uses Supabase Auth for owner identity.
 
-The exact stack should be confirmed after reviewing deployment constraints, but the accounting domain rules should remain independent of UI framework.
+1. Create a Supabase project.
+2. Apply `supabase/migrations/0001_initial_schema.sql` using the Supabase CLI or SQL editor.
+3. Configure environment variables only after the database is created. Never commit real secrets.
+4. Review RLS policies and run the migration against a non-production project before onboarding real users.
 
-## Product milestones
+The `create_business_transaction(jsonb)` RPC atomically creates a transaction and its payment allocations, records an audit event, and uses an idempotency key. It is the first transaction-write path; line-item posting, stock movement posting, accounting ledger entries, reversals and live dashboard reads remain follow-up work.
 
-1. Repository foundation, product requirements and CI
-2. Authentication and one-business onboarding
-3. Parties, products and transaction engine
-4. Daily dashboard and cash reconciliation
-5. Reports, export, accessibility and PWA support
-6. Pilot testing with real shopkeepers
-7. Premium features only after core usage is validated
+## MVP scope
 
-## Success criteria for pilot
+- One business and one owner
+- Daily dashboard: sales, collections, expenses, cash position and outstanding dues
+- Sales, purchases, expenses, customer receipts, supplier payments and refunds
+- Customer/supplier records and basic products/stock movements
+- Daily/monthly reports and data export
+- Responsive, installable Progressive Web App
+- Free core tier; premium features deferred until usage is validated
 
-- An owner can record a common transaction quickly on a phone.
-- Sales, receipts and outstanding balances reconcile in tested scenarios.
-- Duplicate submission attempts do not duplicate financial records.
-- A user can export their own data.
-- No cross-business data access is possible.
-- Daily closing discrepancies are visible and explainable.
+## Financial integrity principles
 
-## Status
+1. Sales are not the same as collections.
+2. Cash movements are not the same as profit.
+3. Store money in integer paise or exact decimals, never floating point.
+4. Post transactions atomically with related records.
+5. Correct posted transactions with reversals/correction records, not silent edits.
+6. Scope all data to the authenticated business on the server.
+7. Use idempotency keys to prevent duplicate submissions and offline-sync retries.
+8. Keep an audit trail of financial changes.
 
-Initial repository setup. No production-ready application is implemented yet.
+No production data should be entered until authentication, authorization, backup/restore, reversal handling, stock posting and accounting ledger entries are fully validated.
