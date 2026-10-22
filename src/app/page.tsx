@@ -116,14 +116,14 @@ export default async function HomePage() {
        coalesce((select sum(t.amount_paise) from public.business_transactions t
          where t.business_id = ctx.id and t.status = 'posted' and t.transaction_type = 'expense'
            and t.business_date = ctx.today), 0)::text as expenses_paise,
-       coalesce((select sum(p.amount_paise) from public.transaction_payments p
+       (coalesce((select sum(p.amount_paise) from public.transaction_payments p
          join public.business_transactions t on t.id = p.transaction_id and t.business_id = p.business_id
          where p.business_id = ctx.id and t.status = 'posted'
            and t.transaction_type in ('sale','customer_receipt','purchase_return','other_income')
-           and p.payment_method = 'cash' and p.payment_date = ctx.today), 0)::text
+           and p.payment_method = 'cash' and p.payment_date = ctx.today), 0)
          + coalesce((select sum(t.cash_delta_paise) from public.business_transactions t
            where t.business_id = ctx.id and t.status = 'posted' and t.transaction_type = 'cash_adjustment'
-             and t.cash_delta_paise > 0 and t.business_date = ctx.today), 0)::text as cash_received_paise,
+             and t.cash_delta_paise > 0 and t.business_date = ctx.today), 0))::text as cash_received_paise,
        (coalesce((select sum(p.amount_paise) from public.transaction_payments p
          join public.business_transactions t on t.id = p.transaction_id and t.business_id = p.business_id
          where p.business_id = ctx.id and t.status = 'posted'
