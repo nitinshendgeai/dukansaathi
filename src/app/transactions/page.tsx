@@ -72,7 +72,6 @@ export default function TransactionsPage() {
   }, [router]);
 
   useEffect(() => {
-    setDate(localDateString(new Date()));
     let active = true;
     async function initialise() {
       const supabase = createSupabaseBrowserClient();
@@ -82,6 +81,7 @@ export default function TransactionsPage() {
         return;
       }
       const { data } = await supabase.auth.getUser();
+      if (active) setDate(localDateString(new Date()));
       if (!data.user) {
         router.replace("/login");
         return;
