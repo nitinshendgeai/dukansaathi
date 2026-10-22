@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -14,14 +13,14 @@ export default function OnboardingPage() {
   useEffect(() => {
     let active = true;
     async function checkSession() {
-      const supabase = createSupabaseBrowserClient();
-      if (!supabase) return;
-      const { data } = await supabase.auth.getUser();
-      if (!data.user && active) router.replace("/login");
-      if (data.user && active) {
+      try {
         const response = await fetch("/api/business");
         const payload = await response.json();
-        if (active && response.ok && payload.business) router.replace("/transactions");
+        if (!active) return;
+        if (response.status === 401) router.replace("/login");
+        else if (response.ok && payload.business) router.replace("/transactions");
+      } catch {
+        if (active) setError("Could not reach the server. Please refresh and try again.");
       }
     }
     void checkSession();
