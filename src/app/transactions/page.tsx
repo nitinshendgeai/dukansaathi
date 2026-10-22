@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, CircleAlert, LoaderCircle, Plus } from "lucide-react";
 import { formatINRFromPaise } from "@/lib/finance";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type TransactionType = "sale" | "expense" | "purchase" | "customer_receipt" | "supplier_payment";
 type TransactionRow = {
@@ -74,18 +73,7 @@ export default function TransactionsPage() {
   useEffect(() => {
     let active = true;
     async function initialise() {
-      const supabase = createSupabaseBrowserClient();
-      if (!supabase) {
-        setError("Supabase is not configured. Add the environment variables and apply the database migration first.");
-        setLoading(false);
-        return;
-      }
-      const { data } = await supabase.auth.getUser();
       if (active) setDate(localDateString(new Date()));
-      if (!data.user) {
-        router.replace("/login");
-        return;
-      }
       const response = await fetch("/api/business");
       const payload = await response.json();
       if (!response.ok) {
