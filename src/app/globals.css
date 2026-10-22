@@ -175,7 +175,7 @@ h1 { margin: 0; font-size: clamp(25px, 5vw, 32px); line-height: 1.16; letter-spa
   border-radius: 10px;
   padding: 12px 13px;
   background: #fff;
-  color: var(--text);
+  color: var(--foreground);
   font: inherit;
   font-size: 14px;
   outline: none;
@@ -229,7 +229,7 @@ h1 { margin: 0; font-size: clamp(25px, 5vw, 32px); line-height: 1.16; letter-spa
 .transaction-row { display: flex; justify-content: space-between; gap: 14px; padding: 15px 0; border-bottom: 1px solid #edf0ec; }
 .transaction-row:last-child { border-bottom: 0; }
 .transaction-row-main { display: grid; gap: 5px; min-width: 0; }
-.transaction-row-main strong { color: var(--text); font-size: 13px; text-transform: capitalize; }
+.transaction-row-main strong { color: var(--foreground); font-size: 13px; text-transform: capitalize; }
 .transaction-row-main span, .transaction-row-main small { color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .transaction-row-amount { flex: 0 0 auto; text-align: right; font-size: 13px; font-weight: 850; }
 .transaction-row-amount small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; font-weight: 600; text-transform: capitalize; }
