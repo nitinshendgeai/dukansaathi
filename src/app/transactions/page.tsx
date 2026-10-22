@@ -53,7 +53,7 @@ export default function TransactionsPage() {
   const [paid, setPaid] = useState("");
   const [method, setMethod] = useState<"cash" | "upi" | "bank" | "card" | "other">("cash");
   const [notes, setNotes] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(() => localDateString(new Date()));
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
@@ -73,7 +73,6 @@ export default function TransactionsPage() {
   useEffect(() => {
     let active = true;
     async function initialise() {
-      if (active) setDate(localDateString(new Date()));
       const response = await fetch("/api/business");
       const payload = await response.json();
       if (response.status === 401) {
