@@ -132,6 +132,28 @@ create index if not exists transaction_payments_business_date_idx
 create index if not exists transaction_payments_transaction_idx
   on public.transaction_payments (transaction_id);
 
+-- Links customer receipts to sales invoices and supplier payments to purchase bills.
+-- Payment records remain the source of cash movement; allocations only settle invoice balances.
+create table if not exists public.transaction_allocations (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  settlement_transaction_id uuid not null,
+  invoice_transaction_id uuid not null,
+  amount_paise bigint not null check (amount_paise > 0),
+  created_at timestamptz not null default now(),
+  unique (business_id, settlement_transaction_id, invoice_transaction_id),
+  foreign key (business_id, settlement_transaction_id)
+    references public.business_transactions(business_id, id) on delete restrict,
+  foreign key (business_id, invoice_transaction_id)
+    references public.business_transactions(business_id, id) on delete restrict,
+  check (settlement_transaction_id <> invoice_transaction_id)
+);
+
+create index if not exists transaction_allocations_invoice_idx
+  on public.transaction_allocations (business_id, invoice_transaction_id);
+create index if not exists transaction_allocations_settlement_idx
+  on public.transaction_allocations (business_id, settlement_transaction_id);
+
 create table if not exists public.stock_movements (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -201,7 +223,12 @@ declare
   v_notes text := nullif(p_payload->>'notes', '');
   v_cash_delta bigint := nullif(p_payload->>'cash_delta_paise', '')::bigint;
   v_payment_total bigint := 0;
+  v_allocation_total bigint := 0;
   v_payment jsonb;
+  v_allocation jsonb;
+  v_invoice public.business_transactions;
+  v_invoice_due bigint;
+  v_expected_invoice_type text;
   v_doc_no text;
   v_existing public.business_transactions;
   v_created public.business_transactions;
@@ -260,6 +287,55 @@ begin
     raise exception 'Payment allocations cannot exceed transaction amount' using errcode = '22023';
   end if;
 
+  if jsonb_typeof(coalesce(p_payload->'invoice_allocations', '[]'::jsonb)) <> 'array' then
+    raise exception 'invoice_allocations must be an array' using errcode = '22023';
+  end if;
+  if v_type not in ('customer_receipt', 'supplier_payment')
+     and jsonb_array_length(coalesce(p_payload->'invoice_allocations', '[]'::jsonb)) > 0 then
+    raise exception 'Only customer receipts and supplier payments can settle invoices' using errcode = '22023';
+  end if;
+  if jsonb_array_length(coalesce(p_payload->'invoice_allocations', '[]'::jsonb)) > 0 and v_party_id is null then
+    raise exception 'A customer or supplier is required when allocating a settlement' using errcode = '22023';
+  end if;
+
+  v_expected_invoice_type := case when v_type = 'customer_receipt' then 'sale'
+                                  when v_type = 'supplier_payment' then 'purchase'
+                                  else null end;
+  for v_allocation in select value from jsonb_array_elements(coalesce(p_payload->'invoice_allocations', '[]'::jsonb))
+  loop
+    if coalesce((v_allocation->>'amount_paise')::bigint, 0) <= 0 then
+      raise exception 'Invoice allocation amount must be positive' using errcode = '22023';
+    end if;
+    v_allocation_total := v_allocation_total + (v_allocation->>'amount_paise')::bigint;
+    if v_allocation_total > v_amount then
+      raise exception 'Invoice allocations cannot exceed the settlement amount' using errcode = '22023';
+    end if;
+
+    select * into v_invoice
+    from public.business_transactions
+    where id = nullif(v_allocation->>'invoice_transaction_id', '')::uuid
+      and business_id = v_business_id
+      and transaction_type = v_expected_invoice_type
+      and status = 'posted'
+      and party_id = v_party_id
+    for update;
+
+    if not found then
+      raise exception 'Invoice not found for this customer or supplier' using errcode = '22023';
+    end if;
+
+    select greatest(0, v_invoice.amount_paise
+      - coalesce((select sum(p.amount_paise) from public.transaction_payments p
+                  where p.business_id = v_business_id and p.transaction_id = v_invoice.id), 0)
+      - coalesce((select sum(a.amount_paise) from public.transaction_allocations a
+                  where a.business_id = v_business_id and a.invoice_transaction_id = v_invoice.id), 0))
+      into v_invoice_due;
+
+    if (v_allocation->>'amount_paise')::bigint > v_invoice_due then
+      raise exception 'Invoice allocation exceeds the remaining balance' using errcode = '22023';
+    end if;
+  end loop;
+
   select * into v_existing
   from public.business_transactions
   where business_id = v_business_id and idempotency_key = v_key;
@@ -292,6 +368,17 @@ begin
       v_payment->>'payment_method',
       coalesce(nullif(v_payment->>'payment_date', '')::date, v_date),
       nullif(v_payment->>'reference', '')
+    );
+  end loop;
+
+  for v_allocation in select value from jsonb_array_elements(coalesce(p_payload->'invoice_allocations', '[]'::jsonb))
+  loop
+    insert into public.transaction_allocations (
+      business_id, settlement_transaction_id, invoice_transaction_id, amount_paise
+    ) values (
+      v_business_id, v_created.id,
+      (v_allocation->>'invoice_transaction_id')::uuid,
+      (v_allocation->>'amount_paise')::bigint
     );
   end loop;
 
