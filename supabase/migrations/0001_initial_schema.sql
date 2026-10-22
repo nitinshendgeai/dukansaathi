@@ -226,6 +226,12 @@ create policy daily_closings_owner_all on public.daily_closings
 create policy audit_logs_owner_select on public.audit_logs
   for select to authenticated
   using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
+create policy audit_logs_owner_insert on public.audit_logs
+  for insert to authenticated
+  with check (
+    actor_user_id = (select auth.uid()) and
+    exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid()))
+  );
 
 -- A single RPC inserts the transaction and its payments atomically. It is deliberately
 -- a narrow first API; item lines and stock movements will be included in the next step.
@@ -262,7 +268,7 @@ begin
     raise exception 'Business not found or access denied' using errcode = '42501';
   end if;
 
-  if v_type not in ('sale', 'purchase', 'expense', 'customer_receipt', 'supplier_payment',
+  if v_type is null or v_type not in ('sale', 'purchase', 'expense', 'customer_receipt', 'supplier_payment',
                     'sales_refund', 'purchase_return', 'other_income', 'cash_adjustment') then
     raise exception 'Unsupported transaction type' using errcode = '22023';
   end if;
@@ -348,7 +354,18 @@ begin
   );
 
   return v_created;
+exception
+  when unique_violation then
+    -- Concurrent retries can race the initial idempotency lookup. Return the
+    -- original transaction if the same key won; rethrow unrelated constraints.
+    select * into v_existing
+    from public.business_transactions
+    where business_id = v_business_id and idempotency_key = v_key;
+    if found then
+      return v_existing;
+    end if;
+    raise;
 end;
-$$;
+$;
 
 grant execute on function public.create_business_transaction(jsonb) to authenticated;
