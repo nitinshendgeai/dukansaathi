@@ -96,6 +96,36 @@ describe("calculateDailyFinanceSummary", () => {
     })).toThrow(/transaction.amountPaise/);
   });
 
+  it("allows negative expected cash so reconciliation can expose a mistake", () => {
+    const summary = calculateDailyFinanceSummary({
+      openingCashPaise: 0,
+      receivablesPaise: 0,
+      payablesPaise: 0,
+      transactions: [{
+        type: "expense",
+        status: "posted",
+        amountPaise: 500,
+        payments: [{ amountPaise: 500, method: "cash" }]
+      }]
+    });
+
+    expect(summary.expectedCashPaise).toBe(-500);
+  });
+
+  it("rejects payment totals greater than a customer receipt amount", () => {
+    expect(() => calculateDailyFinanceSummary({
+      openingCashPaise: 0,
+      receivablesPaise: 0,
+      payablesPaise: 0,
+      transactions: [{
+        type: "customer_receipt",
+        status: "posted",
+        amountPaise: 100,
+        payments: [{ amountPaise: 101, method: "cash" }]
+      }]
+    })).toThrow(/Payments cannot exceed/);
+  });
+
   it("formats integer paise as INR", () => {
     expect(formatINRFromPaise(123456)).toContain("1,234.56");
   });
