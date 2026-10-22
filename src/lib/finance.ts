@@ -113,8 +113,6 @@ export function calculateDailyFinanceSummary(
     const paymentTotal = sumPayments(transaction.payments);
 
     if (paymentTotal > transaction.amountPaise &&
-        transaction.type !== "customer_receipt" &&
-        transaction.type !== "supplier_payment" &&
         transaction.type !== "cash_adjustment") {
       throw new Error("Payments cannot exceed the transaction amount");
     }
@@ -158,7 +156,8 @@ export function calculateDailyFinanceSummary(
     input.openingCashPaise + summary.cashReceivedPaise - summary.cashPaidPaise;
 
   for (const [key, value] of Object.entries(summary)) {
-    if (!Number.isSafeInteger(value) || value < 0) {
+    const canBeNegative = key === "expectedCashPaise";
+    if (!Number.isSafeInteger(value) || (!canBeNegative && value < 0)) {
       throw new Error(`Calculated ${key} is invalid; check input amounts and cash movements`);
     }
   }
