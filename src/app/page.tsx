@@ -11,7 +11,6 @@ import {
   ChartNoAxesCombined,
   CircleHelp,
   Clock3,
-  FileText,
   HandCoins,
   House,
   IndianRupee,
