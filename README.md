@@ -4,7 +4,7 @@ A mobile-first daily business manager for small businesses in India.
 
 ## Current status
 
-**Railway deployment preparation:** Next.js application, PostgreSQL schema, email/password registration and login, signed HTTP-only sessions, owner-scoped business APIs, and transaction create/list endpoints. The dashboard still displays sample figures; it is not a live financial report yet.
+**Local application implementation:** Next.js application, PostgreSQL schema, email/password registration and login, signed HTTP-only sessions, owner-scoped business APIs, transaction entry/listing, and a database-backed dashboard for daily sales, collections, expenses, cash movement, recent activity, and estimated outstanding balances. Live database behavior has not yet been verified against a real PostgreSQL instance.
 
 ## Local development
 
@@ -46,11 +46,13 @@ npm run build
 - Signed, HTTP-only, SameSite session cookie.
 - One business per owner, enforced by a unique database constraint and owner-scoped server queries.
 - Authenticated business creation and transaction listing endpoints.
+- Dashboard reads persisted records and computes daily/month-to-date metrics using the business timezone; it no longer uses illustrative financial figures.
+- Dashboard quick-entry links open transaction entry with the selected transaction type preselected.
 - Atomic transaction creation plus payment allocations and audit event via a PostgreSQL function.
 - Integer-paise monetary inputs, payment allocation validation and idempotency keys.
 - Entry screen for sales, expenses, stock purchases, customer receipts and supplier payments.
 
-Still required before real use: test the migration against a Railway test database; verify authorization isolation and concurrent idempotency; implement transaction line items, stock posting, reversal/correction workflow, live dashboard calculations, account recovery, rate limiting, and production backup/restore procedures.
+Still required before real use: test the migration against a Railway test database; verify authorization isolation and concurrent idempotency; implement invoice-linked payment allocation, transaction line items, stock posting, reversal/correction workflow, account recovery, rate limiting, and production backup/restore procedures. Dashboard receivables/payables are business-wide estimates until payments can be allocated to individual invoices.
 
 ## Financial integrity principles
 
