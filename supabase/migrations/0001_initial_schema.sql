@@ -1,12 +1,21 @@
--- Dukaan Saathi MVP schema
--- Apply with the Supabase CLI after linking a project. This migration intentionally
--- keeps all financial writes business-scoped and uses integer paise for money.
+-- Dukaan Saathi initial PostgreSQL schema for Railway.
+-- Apply once to a new Railway PostgreSQL database. Keep the database private.
+-- Application authorization is enforced by server-side session checks and owner-scoped SQL.
 
 create extension if not exists pgcrypto;
 
+create table if not exists public.app_users (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique check (email = lower(email)),
+  password_hash text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+
 create table if not exists public.businesses (
   id uuid primary key default gen_random_uuid(),
-  owner_user_id uuid not null references auth.users(id) on delete restrict,
+  owner_user_id uuid not null references public.app_users(id) on delete restrict,
   name text not null check (length(trim(name)) between 1 and 120),
   business_type text not null default 'general',
   currency_code text not null default 'INR' check (currency_code = 'INR'),
@@ -63,7 +72,7 @@ create table if not exists public.business_transactions (
   party_id uuid,
   idempotency_key text not null check (length(trim(idempotency_key)) between 8 and 200),
   notes text,
-  created_by uuid not null references auth.users(id) on delete restrict,
+  created_by uuid not null references public.app_users(id) on delete restrict,
   created_at timestamptz not null default now(),
   posted_at timestamptz,
   reversed_transaction_id uuid references public.business_transactions(id) on delete restrict,
@@ -131,7 +140,7 @@ create table if not exists public.stock_movements (
   quantity_delta numeric(14,3) not null check (quantity_delta <> 0),
   reason text not null check (reason in ('purchase', 'sale', 'sales_return', 'purchase_return', 'adjustment', 'opening_stock')),
   notes text,
-  created_by uuid not null references auth.users(id) on delete restrict,
+  created_by uuid not null references public.app_users(id) on delete restrict,
   created_at timestamptz not null default now(),
   foreign key (business_id, product_id) references public.products(business_id, id),
   foreign key (business_id, transaction_id)
@@ -150,7 +159,7 @@ create table if not exists public.daily_closings (
   counted_cash_paise bigint not null check (counted_cash_paise >= 0),
   difference_paise bigint generated always as (counted_cash_paise - expected_cash_paise) stored,
   notes text,
-  closed_by uuid not null references auth.users(id) on delete restrict,
+  closed_by uuid not null references public.app_users(id) on delete restrict,
   closed_at timestamptz not null default now(),
   unique (business_id, business_date)
 );
@@ -158,7 +167,7 @@ create table if not exists public.daily_closings (
 create table if not exists public.audit_logs (
   id bigint generated always as identity primary key,
   business_id uuid not null references public.businesses(id) on delete cascade,
-  actor_user_id uuid references auth.users(id) on delete set null,
+  actor_user_id uuid references public.app_users(id) on delete set null,
   action text not null,
   entity_type text not null,
   entity_id uuid,
@@ -169,69 +178,9 @@ create table if not exists public.audit_logs (
 create index if not exists audit_logs_business_created_idx
   on public.audit_logs (business_id, created_at desc);
 
--- RLS: the MVP permits only the authenticated owner. Multi-user membership is deferred.
-alter table public.businesses enable row level security;
-alter table public.parties enable row level security;
-alter table public.products enable row level security;
-alter table public.business_transactions enable row level security;
-alter table public.transaction_lines enable row level security;
-alter table public.transaction_payments enable row level security;
-alter table public.stock_movements enable row level security;
-alter table public.daily_closings enable row level security;
-alter table public.audit_logs enable row level security;
-
-create policy businesses_owner_select on public.businesses
-  for select to authenticated using (owner_user_id = (select auth.uid()));
-create policy businesses_owner_insert on public.businesses
-  for insert to authenticated with check (owner_user_id = (select auth.uid()));
-create policy businesses_owner_update on public.businesses
-  for update to authenticated using (owner_user_id = (select auth.uid()))
-  with check (owner_user_id = (select auth.uid()));
-
-create policy parties_owner_all on public.parties
-  for all to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())))
-  with check (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-
-create policy products_owner_all on public.products
-  for all to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())))
-  with check (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-
-create policy transactions_owner_all on public.business_transactions
-  for all to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())))
-  with check (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-
-create policy transaction_lines_owner_all on public.transaction_lines
-  for all to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())))
-  with check (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-
-create policy transaction_payments_owner_all on public.transaction_payments
-  for all to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())))
-  with check (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-
-create policy stock_movements_owner_all on public.stock_movements
-  for all to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())))
-  with check (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-
-create policy daily_closings_owner_all on public.daily_closings
-  for all to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())))
-  with check (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-
-create policy audit_logs_owner_select on public.audit_logs
-  for select to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid())));
-create policy audit_logs_owner_insert on public.audit_logs
-  for insert to authenticated
-  with check (
-    actor_user_id = (select auth.uid()) and
-    exists (select 1 from public.businesses b where b.id = business_id and b.owner_user_id = (select auth.uid()))
-  );
+-- This app uses a private Railway PostgreSQL connection and a server-only DB role.
+-- Do not expose DATABASE_URL to the browser. API handlers authenticate the signed
+-- session and include owner_user_id/business_id in all data access queries.
 
 -- A single RPC inserts the transaction and its payments atomically. It is deliberately
 -- a narrow first API; item lines and stock movements will be included in the next step.
@@ -242,7 +191,7 @@ security invoker
 set search_path = public, pg_temp
 as $$
 declare
-  v_user_id uuid := auth.uid();
+  v_user_id uuid := nullif(current_setting('app.user_id', true), '')::uuid;
   v_business_id uuid := (p_payload->>'business_id')::uuid;
   v_type text := p_payload->>'transaction_type';
   v_date date := (p_payload->>'business_date')::date;
@@ -368,4 +317,4 @@ exception
 end;
 $;
 
-grant execute on function public.create_business_transaction(jsonb) to authenticated;
+-- The app database role invokes this function only after setting app.user_id in a transaction.
