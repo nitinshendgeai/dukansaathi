@@ -84,7 +84,6 @@ function NavigationLinks({ mobile = false }: { mobile?: boolean }) {
             key={item.label}
             className={`${mobile ? "" : "nav-link"}${item.active ? " active" : ""}`}
             aria-current={item.active ? "page" : undefined}
-            onClick={mobile ? undefined : (event) => event.preventDefault()}
           >
             <Icon size={18} strokeWidth={1.8} />
             <span>{mobile ? item.label === "Customers & suppliers" ? "Parties" : item.label === "Transactions" ? "Bills" : item.label : item.label}</span>
