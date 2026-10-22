@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import {
   ArrowDownLeft,
   ArrowDownRight,
@@ -57,7 +58,7 @@ function MetricCard({
   label: string;
   value: number;
   footnote: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
   primary?: boolean;
 }) {
   return (
