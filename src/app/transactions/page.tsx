@@ -76,6 +76,10 @@ export default function TransactionsPage() {
       if (active) setDate(localDateString(new Date()));
       const response = await fetch("/api/business");
       const payload = await response.json();
+      if (response.status === 401) {
+        router.replace("/login");
+        return;
+      }
       if (!response.ok) {
         if (active) setError(payload.error ?? "Could not load business.");
         setLoading(false);
