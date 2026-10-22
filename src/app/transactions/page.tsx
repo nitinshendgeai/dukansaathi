@@ -25,6 +25,26 @@ function makeIdempotencyKey() {
   return `web-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`;
 }
 
+function localDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseRupeesToPaise(raw: string, allowZero = false): number {
+  const value = raw.trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) {
+    throw new Error("Enter an amount with no more than two decimal places.");
+  }
+  const [rupees, fraction = ""] = value.split(".");
+  const paise = Number(rupees) * 100 + Number(fraction.padEnd(2, "0"));
+  if (!Number.isSafeInteger(paise) || (allowZero ? paise < 0 : paise <= 0)) {
+    throw new Error(allowZero ? "Enter a valid non-negative amount." : "Enter an amount greater than ₹0.00.");
+  }
+  return paise;
+}
+
 export default function TransactionsPage() {
   const router = useRouter();
   const [business, setBusiness] = useState<Business | null>(null);
@@ -34,7 +54,7 @@ export default function TransactionsPage() {
   const [paid, setPaid] = useState("");
   const [method, setMethod] = useState<"cash" | "upi" | "bank" | "card" | "other">("cash");
   const [notes, setNotes] = useState("");
-  const [date, setDate] = useState(new Date().toLocaleDateString("en-CA"));
+  const [date, setDate] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
@@ -52,6 +72,7 @@ export default function TransactionsPage() {
   }, [router]);
 
   useEffect(() => {
+    setDate(localDateString(new Date()));
     let active = true;
     async function initialise() {
       const supabase = createSupabaseBrowserClient();
@@ -97,13 +118,16 @@ export default function TransactionsPage() {
     setError("");
     setSuccess("");
 
-    const amountPaise = Math.round(Number(amount) * 100);
-    const paidPaise = paid.trim() === "" ? 0 : Math.round(Number(paid) * 100);
-    if (!Number.isFinite(Number(amount)) || amountPaise <= 0) {
-      setError("Enter an amount greater than ₹0.00.");
+    let amountPaise: number;
+    let paidPaise: number;
+    try {
+      amountPaise = parseRupeesToPaise(amount);
+      paidPaise = paid.trim() === "" ? 0 : parseRupeesToPaise(paid, true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Enter valid amounts.");
       return;
     }
-    if (!Number.isFinite(paidPaise) || paidPaise < 0 || paidPaise > amountPaise) {
+    if (paidPaise > amountPaise) {
       setError("Amount paid must be between ₹0.00 and the transaction total.");
       return;
     }
