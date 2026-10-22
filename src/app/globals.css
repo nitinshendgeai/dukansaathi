@@ -242,3 +242,11 @@ h1 { margin: 0; font-size: clamp(25px, 5vw, 32px); line-height: 1.16; letter-spa
   .transactions-grid { grid-template-columns: minmax(320px, .8fr) minmax(0, 1.2fr); gap: 20px; }
   .transaction-list-panel { position: sticky; top: 20px; }
 }
+
+
+/* Dashboard navigation and linked quick actions */
+.nav-disabled { opacity: .48; cursor: not-allowed; }
+.nav-coming { display: grid; justify-items: center; align-content: center; gap: 4px; color: var(--muted); opacity: .5; font-size: 10px; font-weight: 600; cursor: not-allowed; }
+.action-card { color: var(--foreground); text-align: left; text-decoration: none; cursor: pointer; transition: border-color .15s ease, transform .15s ease; }
+a.action-card:hover { border-color: #a8cdb5; transform: translateY(-1px); }
+a.action-card:focus-visible, .nav-list a:focus-visible, .bottom-nav a:focus-visible { outline: 3px solid rgba(33, 110, 74, .25); outline-offset: 3px; }
