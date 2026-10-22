@@ -59,6 +59,14 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    const requestedType = new URLSearchParams(window.location.search).get("type");
+    const allowedTypes: TransactionType[] = ["sale", "expense", "purchase", "customer_receipt", "supplier_payment"];
+    if (requestedType && allowedTypes.includes(requestedType as TransactionType)) {
+      setType(requestedType as TransactionType);
+    }
+  }, []);
+
   const loadTransactions = useCallback(async (businessId: string) => {
     const response = await fetch(`/api/transactions?businessId=${encodeURIComponent(businessId)}`);
     const payload = await response.json();
